@@ -477,16 +477,7 @@ if not st.session_state.onboarding_complete:
 # Page 1: Inputs (experienced investors with existing assets)
 # =========================================================
 if st.session_state.page == "inputs":
-    st.markdown("""
-    <div style="padding: 1rem 0 1.5rem;">
-        <h1 style="font-size: 1.6rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
-            ESG Portfolio Optimiser
-        </h1>
-        <p style="color: #6B7280; font-size: 0.95rem;">
-            Mean-variance optimisation with ESG screening
-        </p>
-    </div>
-""", unsafe_allow_html=True)
+    st.title("Portfolio Inputs")
 
     if st.session_state.investor_type == "Experienced Investor":
         st.caption("Experienced Investor path: enter your existing asset combination below.")
