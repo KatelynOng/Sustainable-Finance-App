@@ -10,7 +10,7 @@ st.set_page_config(page_title="ESG Portfolio Optimiser", layout="wide")
 # Defaults
 # =========================================================
 DEFAULTS = {
-    "page": "intro",
+    "page": "inputs",
     "mu1_pct": 5.00,
     "mu2_pct": 12.00,
     "sigma1_pct": 9.00,
@@ -24,6 +24,13 @@ DEFAULTS = {
     "num_points": 1001,
     "frontier_points": 80,
     "trading_days": 252,
+    "onboarding_complete": False,
+    "onboarding_step": "investor_type",
+    "investor_type": None,
+    "has_existing_assets": None,
+    "risk_profile": None,
+    "esg_profile": None,
+    "beginner_mode": False,
 }
 
 for k, v in DEFAULTS.items():
@@ -34,6 +41,154 @@ for k, v in DEFAULTS.items():
 def go_to(page_name: str):
     st.session_state.page = page_name
     st.rerun()
+
+
+def reset_onboarding():
+    st.session_state.onboarding_complete = False
+    st.session_state.onboarding_step = "investor_type"
+    st.session_state.investor_type = None
+    st.session_state.has_existing_assets = None
+    st.session_state.risk_profile = None
+    st.session_state.esg_profile = None
+    st.session_state.beginner_mode = False
+    st.session_state.page = "inputs"
+    st.rerun()
+
+
+# =========================================================
+# Onboarding helpers
+# =========================================================
+RISK_MAP = {
+    "Aggressive": 1.5,
+    "Balanced": 4.0,
+    "Conservative": 8.0,
+}
+
+ESG_MAP = {
+    "Low ESG Impact": 0.10,
+    "Medium ESG Impact": 0.45,
+    "High ESG Impact": 0.85,
+}
+
+
+def apply_first_time_choices(risk_choice: str, esg_choice: str, custom_gamma: float, custom_lambda: float):
+    if risk_choice == "Custom":
+        gamma_value = float(custom_gamma)
+    else:
+        gamma_value = RISK_MAP[risk_choice]
+
+    if esg_choice == "Custom":
+        lambda_value = float(custom_lambda)
+    else:
+        lambda_value = ESG_MAP[esg_choice]
+
+    st.session_state.gamma = gamma_value
+    st.session_state.lambda_esg = lambda_value
+    st.session_state.risk_profile = risk_choice
+    st.session_state.esg_profile = esg_choice
+    st.session_state.investor_type = "New to Investing/First Time User"
+    st.session_state.beginner_mode = True
+    st.session_state.onboarding_complete = True
+    st.session_state.page = "results"
+    st.rerun()
+
+
+@st.dialog("Welcome to the ESG Portfolio Optimiser", width="medium", dismissible=False)
+def onboarding_dialog():
+    step = st.session_state.onboarding_step
+
+    if step == "investor_type":
+        st.write("**Are you an experienced investor or a first time user on the app?**")
+        investor_choice = st.radio(
+            "Select one option",
+            ["Experienced Investor", "New to Investing/First Time User"],
+            key="dialog_investor_type",
+            label_visibility="collapsed",
+        )
+
+        c1, c2 = st.columns(2)
+        with c2:
+            if st.button("Continue", use_container_width=True, key="continue_investor_type"):
+                st.session_state.investor_type = investor_choice
+                if investor_choice == "Experienced Investor":
+                    st.session_state.onboarding_step = "experienced_path"
+                else:
+                    st.session_state.onboarding_step = "first_time_path"
+                st.rerun()
+
+    elif step == "experienced_path":
+        st.write("**Do you have an existing asset combination you would like to invest in?**")
+        asset_choice = st.radio(
+            "Select one option",
+            ["Yes", "No"],
+            key="dialog_existing_assets",
+            label_visibility="collapsed",
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Back", use_container_width=True, key="back_experienced"):
+                st.session_state.onboarding_step = "investor_type"
+                st.rerun()
+        with c2:
+            if st.button("Continue", use_container_width=True, key="continue_experienced"):
+                st.session_state.has_existing_assets = asset_choice
+                st.session_state.beginner_mode = False
+                st.session_state.onboarding_complete = True
+                if asset_choice == "Yes":
+                    st.session_state.page = "inputs"
+                else:
+                    # Best-effort assumption: if no existing combination is available,
+                    # send the user straight to results using the app defaults.
+                    st.session_state.page = "results"
+                st.rerun()
+
+    elif step == "first_time_path":
+        st.write("**How risk averse are you?**")
+        risk_choice = st.radio(
+            "Risk profile",
+            ["Aggressive", "Balanced", "Conservative", "Custom"],
+            key="dialog_risk_choice",
+        )
+
+        custom_gamma = 4.0
+        if risk_choice == "Custom":
+            custom_gamma = st.slider(
+                "Select your custom risk aversion value",
+                min_value=0.5,
+                max_value=10.0,
+                value=4.0,
+                step=0.1,
+                key="dialog_custom_gamma",
+            )
+
+        st.markdown("---")
+        st.write("**Please select a number that reflects your ESG preferences:**")
+        esg_choice = st.radio(
+            "ESG preference",
+            ["Low ESG Impact", "Medium ESG Impact", "High ESG Impact", "Custom"],
+            key="dialog_esg_choice",
+        )
+
+        custom_lambda = 0.45
+        if esg_choice == "Custom":
+            custom_lambda = st.slider(
+                "Select your custom ESG intensity value",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.45,
+                step=0.01,
+                key="dialog_custom_lambda",
+            )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Back", use_container_width=True, key="back_first_time"):
+                st.session_state.onboarding_step = "investor_type"
+                st.rerun()
+        with c2:
+            if st.button("Continue", use_container_width=True, key="continue_first_time"):
+                apply_first_time_choices(risk_choice, esg_choice, custom_gamma, custom_lambda)
 
 
 # =========================================================
@@ -163,7 +318,6 @@ def load_fast_workbook() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     if missing:
         raise ValueError(f"Summary sheet is missing required columns: {sorted(missing)}")
 
-    # Clean summary table
     firms = summary[[
         "Ticker",
         "ESG Company Name (2025)",
@@ -184,13 +338,11 @@ def load_fast_workbook() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     firms = firms.dropna(subset=["Ticker", "ESG Score", "Expected Return"]).copy()
     firms = firms.drop_duplicates(subset=["Ticker"]).sort_values("Ticker").reset_index(drop=True)
 
-    # Clean covariance matrix
     cov = cov.rename(columns={cov.columns[0]: "Ticker"}).copy()
     cov["Ticker"] = cov["Ticker"].astype(str)
     cov = cov.set_index("Ticker")
     cov = cov.apply(pd.to_numeric, errors="coerce")
 
-    # Clean correlation matrix
     corr = corr.rename(columns={corr.columns[0]: "Ticker"}).copy()
     corr["Ticker"] = corr["Ticker"].astype(str)
     corr = corr.set_index("Ticker")
@@ -202,7 +354,6 @@ def load_fast_workbook() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     cov = cov.loc[tickers, tickers]
     corr = corr.loc[tickers, tickers]
 
-    # Remove any incomplete rows/cols
     bad = set(cov.index[cov.isna().any(axis=1)])
     bad |= set(cov.columns[cov.isna().any(axis=0)])
     bad |= set(corr.index[corr.isna().any(axis=1)])
@@ -313,44 +464,26 @@ def annualise_covariance(daily_cov: pd.DataFrame, trading_days: int) -> pd.DataF
 
 
 # =========================================================
-# Page 1: Introduction
+# Force questionnaire before app use
 # =========================================================
-if st.session_state.page == "intro":
+if not st.session_state.onboarding_complete:
+    onboarding_dialog()
     st.title("ESG Portfolio Optimiser")
-
-    st.markdown(
-        r"""
-        This app compares:
-
-        - a **standard mean-variance setup** using **all portfolios**
-        - an **ESG-screened setup** using only portfolios that satisfy a **minimum portfolio ESG score**
-        - a **firm-level frontier** built from the uploaded matched stock workbook
-
-        The investor utility is:
-
-        \[
-        U = E[R_p] - \frac{\gamma}{2}\sigma_p^2 + \lambda \bar{s}
-        \]
-
-        where:
-
-        - \(E[R_p]\): expected portfolio return
-        - \(\sigma_p\): portfolio standard deviation
-        - \(\gamma\): risk aversion
-        - \(\bar{s}\): weighted average portfolio ESG score
-        - \(\lambda\): ESG preference intensity
-        """
-    )
-
-    if st.button("Continue"):
-        go_to("inputs")
+    st.info("Please complete the questionnaire to start using the app.")
+    st.stop()
 
 
 # =========================================================
-# Page 2: Inputs
+# Page 1: Inputs (experienced investors with existing assets)
 # =========================================================
-elif st.session_state.page == "inputs":
+if st.session_state.page == "inputs":
     st.title("Portfolio Inputs")
+
+    if st.session_state.investor_type == "Experienced Investor":
+        st.caption("Experienced Investor path: enter your existing asset combination below.")
+    else:
+        st.caption("These are the current model assumptions. You can still edit them if you want.")
+
     st.write("Enter all percentages as values from 0 to 100.")
 
     with st.form("input_form"):
@@ -403,15 +536,28 @@ elif st.session_state.page == "inputs":
         st.session_state.trading_days = trading_days
         go_to("results")
 
-    if st.button("Back to introduction"):
-        go_to("intro")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Go to results"):
+            go_to("results")
+    with c2:
+        if st.button("Start over"):
+            reset_onboarding()
 
 
 # =========================================================
-# Page 3: Results
+# Page 2: Results
 # =========================================================
 elif st.session_state.page == "results":
     st.title("Results")
+
+    if st.session_state.beginner_mode:
+        st.success(
+            f"First-time user mode active. Risk aversion γ = {st.session_state.gamma:.2f} and ESG intensity λ = {st.session_state.lambda_esg:.2f}."
+        )
+        st.caption("The theoretical graphs below use the app's default asset assumptions unless you later change them on the inputs page.")
+    elif st.session_state.investor_type == "Experienced Investor" and st.session_state.has_existing_assets == "No":
+        st.info("Experienced Investor path with no existing asset combination selected. The app is using the current default assumptions.")
 
     mu = np.array([st.session_state.mu1_pct, st.session_state.mu2_pct]) / 100.0
     sigma = np.array([st.session_state.sigma1_pct, st.session_state.sigma2_pct]) / 100.0
@@ -452,7 +598,7 @@ elif st.session_state.page == "results":
         """
     )
 
-    tab_analysis, tab_stock = st.tabs(["Portfolio analysis", "Stock-universe frontier"])
+    tab_analysis, tab_stock = st.tabs(["Theoretical model", "Stock-universe frontier"])
 
     with tab_analysis:
         st.subheader("1) Standard mean-variance frontier and CML")
@@ -520,11 +666,14 @@ elif st.session_state.page == "results":
             firms, daily_cov, corr = load_fast_workbook()
             annual_cov = annualise_covariance(daily_cov, st.session_state.trading_days)
 
-            default_cutoff = default_esg_cutoff(
-                asset1_esg_pct=st.session_state.esg1,
-                asset2_esg_pct=st.session_state.esg2,
-                portfolio_esg_cutoff=esg_cutoff,
-            )
+            if st.session_state.beginner_mode:
+                default_cutoff = st.session_state.lambda_esg
+            else:
+                default_cutoff = default_esg_cutoff(
+                    asset1_esg_pct=st.session_state.esg1,
+                    asset2_esg_pct=st.session_state.esg2,
+                    portfolio_esg_cutoff=esg_cutoff,
+                )
 
             st.write(f"Matched stocks available: **{len(firms)}**")
 
@@ -538,14 +687,12 @@ elif st.session_state.page == "results":
                 key="stock_universe_esg_cutoff",
             )
 
-            # Full-stock theoretical frontier
             firms_all = firms.copy()
             mu_all = firms_all["Expected Return"].to_numpy(dtype=float)
             esg_all = firms_all["ESG Score"].to_numpy(dtype=float)
             cov_all = annual_cov.loc[firms_all["Ticker"], firms_all["Ticker"]].to_numpy(dtype=float)
             frontier_all, gmv_all = build_frontier(mu_all, cov_all, esg_all, num_points=st.session_state.frontier_points)
 
-            # ESG-screened frontier
             cutoff = min_company_esg_pct / 100.0
             firms_screened = firms_all[firms_all["ESG Score"] >= cutoff].copy().reset_index(drop=True)
             st.write(f"Stocks meeting ESG cutoff: **{len(firms_screened)}**")
@@ -660,10 +807,13 @@ elif st.session_state.page == "results":
         except Exception as e:
             st.error(f"Could not build the stock-universe frontier from the workbook: {e}")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("Back to inputs"):
+        if st.button("Edit inputs"):
             go_to("inputs")
     with col2:
-        if st.button("Start over"):
-            go_to("intro")
+        if st.button("Refresh questionnaire"):
+            reset_onboarding()
+    with col3:
+        if st.button("Stay on results"):
+            st.rerun()
