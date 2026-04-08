@@ -548,16 +548,14 @@ if st.session_state.page == "inputs":
 # =========================================================
 # Page 2: Results
 # =========================================================
-# Page 2: Results
-# =========================================================
 elif st.session_state.page == "results":
-    # 1. Styled Header (Main Title: Results)
+    # 1. Styled Header (Larger font for Results)
     st.markdown("""
         <div style="padding: 1rem 0 1.5rem;">
-            <h1 style="font-size: 1.6rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
+            <h1 style="font-size: 2.2rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
                 Results
             </h1>
-            <p style="color: #6B7280; font-size: 0.95rem;">
+            <p style="color: #6B7280; font-size: 1.0rem;">
                 ESG Portfolio Optimiser — Mean-variance optimisation with ESG screening
             </p>
         </div>
