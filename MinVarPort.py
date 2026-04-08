@@ -60,7 +60,8 @@ def go_to(page_name: str):
     st.rerun()
 
 def reset_onboarding():
-    for k, v in DEFAULTS.items(): st.session_state[k] = v
+    for k, v in DEFAULTS.items(): 
+        st.session_state[k] = v
     st.rerun()
 
 # =========================================================
@@ -81,20 +82,16 @@ def build_portfolio_grid(mu, sigma, rho, rf, esg_scores, gamma, lambda_esg, num_
         esg = float(np.dot(esg_scores, w))
         sharpe = (exp_ret - rf) / std if std > 0 else 0
         utility = exp_ret - 0.5 * gamma * var + lambda_esg * esg
-        rows.append({"Weight Asset 1": w1, "Weight Asset 2": 1-w1, "Expected Return": exp_ret, "Std Dev": std, "ESG Score": esg, "Sharpe Ratio": sharpe, "Utility": utility})
+        rows.append({
+            "Weight Asset 1": w1, 
+            "Weight Asset 2": 1-w1, 
+            "Expected Return": exp_ret, 
+            "Std Dev": std, 
+            "ESG Score": esg, 
+            "Sharpe Ratio": sharpe, 
+            "Utility": utility
+        })
     return pd.DataFrame(rows)
-
-@st.cache_data
-def load_fast_workbook():
-    file_path = Path("esg_crsp_2025_matched_workbook.xlsx")
-    if not file_path.exists():
-        st.error("Excel file not found!")
-        return None, None, None
-    summary = pd.read_excel(file_path, sheet_name="Summary")
-    cov = pd.read_excel(file_path, sheet_name="Covariance Matrix", index_col=0)
-    # Basic cleaning
-    summary = summary.rename(columns={"ESG Company Name (2025)": "Company", "ESGCombinedScore 2025": "ESG Score", "Latest Available Annual Return (2024)": "Expected Return"})
-    return summary, cov, None
 
 # =========================================================
 # 4. App Pages
@@ -120,19 +117,63 @@ if st.session_state.page == "inputs":
             st.subheader("Asset 1 (Low ESG)")
             mu1 = st.number_input("Return (%)", 0.0, 100.0, float(st.session_state.mu1_pct))
             sig1 = st.number_input("Risk (%)", 0.1, 100.0, float(st.session_state.sigma1_pct))
-            esg1 = st.number_input("ESG Score", 0.0, 100.0, float(st.session_state.esg1))
+            esg1_val = st.number_input("ESG Score", 0.0, 100.0, float(st.session_state.esg1))
         with c2:
             st.subheader("Asset 2 (High ESG)")
             mu2 = st.number_input("Return (%)", 0.0, 100.0, float(st.session_state.mu2_pct))
             sig2 = st.number_input("Risk (%)", 0.1, 100.0, float(st.session_state.sigma2_pct))
-            esg2 = st.number_input("ESG Score", 0.0, 100.0, float(st.session_state.esg2))
+            esg2_val = st.number_input("ESG Score", 0.0, 100.0, float(st.session_state.esg2))
         
         st.divider()
-        rho = st.slider("Correlation", -1.0, 1.0, float(st.session_state.rho))
-        lambda_esg = st.slider("ESG Preference (λ)", 0.0, 1.0, float(st.session_state.lambda_esg))
+        rho_val = st.slider("Correlation", -1.0, 1.0, float(st.session_state.rho))
+        lambda_val = st.slider("ESG Preference (λ)", 0.0, 1.0, float(st.session_state.lambda_esg))
         
         if st.form_submit_button("Generate Results"):
-            st.session_state.mu1_pct, st.session_state.mu2_pct = mu1, mu2
-            st.session_state.sigma1_pct, st.session_state.sigma2_pct = sig1, sig2
-            st.session_state.esg1, st.session_state.esg2 = esg1, esg2
-            st.session_state.rho, st.session_state.lambda_esg = rho, lambda_es
+            st.session_state.mu1_pct = mu1
+            st.session_state.mu2_pct = mu2
+            st.session_state.sigma1_pct = sig1
+            st.session_state.sigma2_pct = sig2
+            st.session_state.esg1 = esg1_val
+            st.session_state.esg2 = esg2_val
+            st.session_state.rho = rho_val
+            st.session_state.lambda_esg = lambda_val
+            go_to("results")
+
+# --- Results Page ---
+elif st.session_state.page == "results":
+    add_styled_header("Optimisation Analysis")
+    
+    # Calc Data
+    mu = np.array([st.session_state.mu1_pct, st.session_state.mu2_pct]) / 100.0
+    sigma = np.array([st.session_state.sigma1_pct, st.session_state.sigma2_pct]) / 100.0
+    rf = st.session_state.rf_pct / 100.0
+    df_all = build_portfolio_grid(mu, sigma, st.session_state.rho, rf, np.array([st.session_state.esg1, st.session_state.esg2])/100, st.session_state.gamma, st.session_state.lambda_esg, 500)
+    
+    tan_pt = df_all.loc[df_all["Sharpe Ratio"].idxmax()]
+
+    # 1. KPI Row
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Optimal Return", f"{tan_pt['Expected Return']:.2%}")
+    m2.metric("Optimal Risk (Vol)", f"{tan_pt['Std Dev']:.2%}")
+    m3.metric("Sharpe Ratio", f"{tan_pt['Sharpe Ratio']:.3f}")
+    m4.metric("Portfolio ESG", f"{tan_pt['ESG Score']*100:.1f}/100")
+    st.divider()
+
+    st.subheader("Efficient Frontier & Capital Market Line")
+    fig = go.Figure()
+    # Frontier
+    fig.add_trace(go.Scatter(x=df_all["Std Dev"]*100, y=df_all["Expected Return"]*100, mode='lines', name='Frontier', line=dict(color='#1D9E75', width=3)))
+    # Tangency Point
+    fig.add_trace(go.Scatter(x=[tan_pt["Std Dev"]*100], y=[tan_pt["Expected Return"]*100], mode='markers', marker=dict(size=15, color='Gold', symbol='star'), name='Optimal Portfolio'))
+    # CML
+    x_range = df_all["Std Dev"].max() * 1.2 * 100
+    fig.add_trace(go.Scatter(x=[0, x_range], y=[rf*100, (rf*100) + (tan_pt["Sharpe Ratio"]*x_range)], mode='lines', name='CML', line=dict(color='gray', dash='dash')))
+    
+    fig.update_layout(template="plotly_white", xaxis_title="Volatility (%)", yaxis_title="Return (%)", hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True)
+    
+    if st.button("← Edit Parameters"):
+        go_to("inputs")
+    
+    if st.button("Reset App"):
+        reset_onboarding()
