@@ -190,11 +190,54 @@ def onboarding_dialog():
             if st.button("Continue", use_container_width=True, key="continue_first_time"):
                 apply_first_time_choices(risk_choice, esg_choice, custom_gamma, custom_lambda)
 
+# ==========================================
+# 1. CALCULATIONS (Required for the metrics)
+# ==========================================
+# Get parameters from session state
+lambda_esg = st.session_state.lambda_esg
+# Define your ESG cutoff (usually the midpoint or based on user preference)
+esg_cutoff = (st.session_state.esg1 + st.session_state.esg2) / 200 
+
+# Identify the key portfolios from your dataframe (df_all)
+# Tangency = Highest Sharpe Ratio
+tan_std = df_all.loc[df_all["Sharpe Ratio"].idxmax()]
+
+# MVP = Minimum Variance Portfolio (Lowest Std Dev)
+mvp_std = df_all.loc[df_all["Std Dev"].idxmin()]
+
+# ESG Tangency (In this context, usually the portfolio at the very end of the frontier)
+tan_esg = df_all.iloc[-1] 
+
+# ==========================================
+# 2. THE METRICS ROW
+# ==========================================
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("ESG Cutoff", f"{esg_cutoff*100:.1f}/100", f"λ = {lambda_esg:.2f}")
-col2.metric("Tangency Return", f"{tan_std['Expected Return']*100:.1f}%", f"Sharpe {tan_std['Sharpe Ratio']:.3f}")
-col3.metric("MVP Std Dev", f"{mvp_std['Std Dev']*100:.1f}%")
-col4.metric("ESG Tangency", f"{tan_esg['Expected Return']*100:.1f}%", "Post-screen")
+
+col1.metric(
+    "ESG Cutoff", 
+    f"{esg_cutoff*100:.1f}/100", 
+    f"λ = {lambda_esg:.2f}"
+)
+
+col2.metric(
+    "Tangency Return", 
+    f"{tan_std['Expected Return']*100:.1f}%", 
+    f"Sharpe {tan_std['Sharpe Ratio']:.3f}"
+)
+
+col3.metric(
+    "MVP Std Dev", 
+    f"{mvp_std['Std Dev']*100:.1f}%",
+    "Lowest Risk"
+)
+
+col4.metric(
+    "ESG Tangency", 
+    f"{tan_esg['Expected Return']*100:.1f}%", 
+    "Post-screen"
+)
+
+st.markdown("---") # Visual separator before the chart
 
 # =========================================================
 # Tab 1: original 2-asset teaching model
