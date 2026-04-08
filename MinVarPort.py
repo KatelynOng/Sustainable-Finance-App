@@ -554,7 +554,7 @@ elif st.session_state.page == "results":
     # 1. Styled Header (Replaces st.title)
     st.markdown("""
         <div style="padding: 1rem 0 1.5rem;">
-            <h1 style="font-size: 1.6rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
+            <h1 style="font-size: 3rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
                 Results
             </h1>
             <p style="color: #6B7280; font-size: 0.95rem;">
