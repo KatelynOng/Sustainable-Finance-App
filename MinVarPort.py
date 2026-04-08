@@ -549,26 +549,16 @@ if st.session_state.page == "inputs":
 # Page 2: Results
 # =========================================================
 elif st.session_state.page == "results":
-    # 1. Styled Header (Larger font for Results)
-    st.markdown("""
-        <div style="padding: 1rem 0 1.5rem;">
-            <h1 style="font-size: 4rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
-                Results
-            </h1>
-            <p style="color: #6B7280; font-size: 1.0rem;">
-                ESG Portfolio Optimiser — Mean-variance optimisation with ESG screening
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.title("Results")
 
     if st.session_state.beginner_mode:
-        st.success(f"First-time user mode active. Risk aversion γ = {st.session_state.gamma:.2f} and ESG intensity λ = {st.session_state.lambda_esg:.2f}.")
-    
-    # ... rest of your code (Calculations, Metrics Row, Tabs) follows here ...
+        st.success(
+            f"First-time user mode active. Risk aversion γ = {st.session_state.gamma:.2f} and ESG intensity λ = {st.session_state.lambda_esg:.2f}."
+        )
+        st.caption("The theoretical graphs below use the app's default asset assumptions unless you later change them on the inputs page.")
+    elif st.session_state.investor_type == "Experienced Investor" and st.session_state.has_existing_assets == "No":
+        st.info("Experienced Investor path with no existing asset combination selected. The app is using the current default assumptions.")
 
-    if st.session_state.beginner_mode:
-        st.success(f"First-time user mode active. Risk aversion γ = {st.session_state.gamma:.2f} and ESG intensity λ = {st.session_state.lambda_esg:.2f}.")
-    
     # --- Calculations ---
     mu = np.array([st.session_state.mu1_pct, st.session_state.mu2_pct]) / 100.0
     sigma = np.array([st.session_state.sigma1_pct, st.session_state.sigma2_pct]) / 100.0
