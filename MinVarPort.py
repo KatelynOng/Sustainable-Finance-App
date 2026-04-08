@@ -190,6 +190,7 @@ def onboarding_dialog():
             if st.button("Continue", use_container_width=True, key="continue_first_time"):
                 apply_first_time_choices(risk_choice, esg_choice, custom_gamma, custom_lambda)
 
+
 # =========================================================
 # Tab 1: original 2-asset teaching model
 # =========================================================
@@ -608,10 +609,9 @@ elif st.session_state.page == "results":
         st.subheader("1) Standard mean-variance frontier and CML")
         # You can keep your Matplotlib code here or replace it with Plotly as discussed
         fig1, ax1 = plt.subplots(figsize=(10, 6))
-        # ... [rest of your plotting code] ...
-        st.pyplot(fig1)
-        st.subheader("Summary table: Standard graph")
-        st.dataframe(format_table(std_summary), use_container_width=True)
+        x_all = df_all["Std Dev"] * 100
+        y_all = df_all["Expected Return"] * 100
+        rf_plot = rf * 100
 
         ax1.plot(x_all, y_all, linewidth=2, label="Mean-variance frontier (all portfolios)")
         sigma_line_1 = np.linspace(0, max(float(x_all.max()), float(tan_std["Std Dev"] * 100)) * 1.10, 200)
