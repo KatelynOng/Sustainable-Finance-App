@@ -190,6 +190,11 @@ def onboarding_dialog():
             if st.button("Continue", use_container_width=True, key="continue_first_time"):
                 apply_first_time_choices(risk_choice, esg_choice, custom_gamma, custom_lambda)
 
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("ESG Cutoff", f"{esg_cutoff*100:.1f}/100", f"λ = {lambda_esg:.2f}")
+col2.metric("Tangency Return", f"{tan_std['Expected Return']*100:.1f}%", f"Sharpe {tan_std['Sharpe Ratio']:.3f}")
+col3.metric("MVP Std Dev", f"{mvp_std['Std Dev']*100:.1f}%")
+col4.metric("ESG Tangency", f"{tan_esg['Expected Return']*100:.1f}%", "Post-screen")
 
 # =========================================================
 # Tab 1: original 2-asset teaching model
