@@ -559,7 +559,6 @@ elif st.session_state.page == "results":
     elif st.session_state.investor_type == "Experienced Investor" and st.session_state.has_existing_assets == "No":
         st.info("Experienced Investor path with no existing asset combination selected. The app is using the current default assumptions.")
 
-    # --- Calculations ---
     mu = np.array([st.session_state.mu1_pct, st.session_state.mu2_pct]) / 100.0
     sigma = np.array([st.session_state.sigma1_pct, st.session_state.sigma2_pct]) / 100.0
     rf = st.session_state.rf_pct / 100.0
@@ -569,15 +568,22 @@ elif st.session_state.page == "results":
     gamma = st.session_state.gamma
     num_points = st.session_state.num_points
 
-    df_all = build_portfolio_grid(mu=mu, sigma=sigma, rho=rho, rf=rf, esg_scores=esg_scores, gamma=gamma, lambda_esg=lambda_esg, num_points=num_points)
+    df_all = build_portfolio_grid(
+        mu=mu,
+        sigma=sigma,
+        rho=rho,
+        rf=rf,
+        esg_scores=esg_scores,
+        gamma=gamma,
+        lambda_esg=lambda_esg,
+        num_points=num_points,
+    )
 
-    # ESG Calculations
     esg_cutoff = required_esg_threshold(df_all, lambda_esg)
     df_esg = df_all[df_all["ESG Score"] >= esg_cutoff - 1e-12].copy()
     if df_esg.empty:
         df_esg = df_all.loc[[df_all["ESG Score"].idxmax()]].copy()
 
-    # Identify Portfolios
     mvp_std, tan_std = select_key_portfolios(df_all)
     mvp_esg, tan_esg = select_key_portfolios(df_esg)
 
@@ -589,18 +595,21 @@ elif st.session_state.page == "results":
     m_col3.metric("MVP Std Dev", f"{mvp_std['Std Dev']*100:.1f}%")
     m_col4.metric("ESG Tangency", f"{tan_esg['Expected Return']*100:.1f}%", "Post-screen")
     
-    st.markdown("---") # Visual separator
-
-    # Summary DataFrames for tables
     std_summary = summary_df(mvp_std, tan_std, ("Minimum Variance Portfolio", "Tangency Portfolio"))
     esg_summary = summary_df(mvp_esg, tan_esg, ("ESG Minimum Variance Portfolio", "ESG Tangency Portfolio"))
 
-    # --- TABS START HERE ---
+    st.markdown(
+        f"""
+        **ESG screen used in the 2-asset ESG graph**
+
+        Required portfolio ESG score = **{esg_cutoff * 100:.2f} / 100**
+        """
+    )
+
     tab_analysis, tab_stock = st.tabs(["Theoretical model", "Stock-universe frontier"])
 
     with tab_analysis:
         st.subheader("1) Standard mean-variance frontier and CML")
-        # You can keep your Matplotlib code here or replace it with Plotly as discussed
         fig1, ax1 = plt.subplots(figsize=(10, 6))
         x_all = df_all["Std Dev"] * 100
         y_all = df_all["Expected Return"] * 100
