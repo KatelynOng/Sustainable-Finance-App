@@ -190,55 +190,6 @@ def onboarding_dialog():
             if st.button("Continue", use_container_width=True, key="continue_first_time"):
                 apply_first_time_choices(risk_choice, esg_choice, custom_gamma, custom_lambda)
 
-# ==========================================
-# 1. CALCULATIONS (Required for the metrics)
-# ==========================================
-# Get parameters from session state
-lambda_esg = st.session_state.lambda_esg
-# Define your ESG cutoff (usually the midpoint or based on user preference)
-esg_cutoff = (st.session_state.esg1 + st.session_state.esg2) / 200 
-
-# Identify the key portfolios from your dataframe (df_all)
-# Tangency = Highest Sharpe Ratio
-tan_std = df_all.loc[df_all["Sharpe Ratio"].idxmax()]
-
-# MVP = Minimum Variance Portfolio (Lowest Std Dev)
-mvp_std = df_all.loc[df_all["Std Dev"].idxmin()]
-
-# ESG Tangency (In this context, usually the portfolio at the very end of the frontier)
-tan_esg = df_all.iloc[-1] 
-
-# ==========================================
-# 2. THE METRICS ROW
-# ==========================================
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric(
-    "ESG Cutoff", 
-    f"{esg_cutoff*100:.1f}/100", 
-    f"λ = {lambda_esg:.2f}"
-)
-
-col2.metric(
-    "Tangency Return", 
-    f"{tan_std['Expected Return']*100:.1f}%", 
-    f"Sharpe {tan_std['Sharpe Ratio']:.3f}"
-)
-
-col3.metric(
-    "MVP Std Dev", 
-    f"{mvp_std['Std Dev']*100:.1f}%",
-    "Lowest Risk"
-)
-
-col4.metric(
-    "ESG Tangency", 
-    f"{tan_esg['Expected Return']*100:.1f}%", 
-    "Post-screen"
-)
-
-st.markdown("---") # Visual separator before the chart
-
 # =========================================================
 # Tab 1: original 2-asset teaching model
 # =========================================================
@@ -596,17 +547,25 @@ if st.session_state.page == "inputs":
 # =========================================================
 # Page 2: Results
 # =========================================================
+# Page 2: Results
+# =========================================================
 elif st.session_state.page == "results":
-    st.title("Results")
+    # 1. Styled Header (Replaces st.title)
+    st.markdown("""
+        <div style="padding: 1rem 0 1.5rem;">
+            <h1 style="font-size: 1.6rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
+                ESG Portfolio Optimiser
+            </h1>
+            <p style="color: #6B7280; font-size: 0.95rem;">
+                Mean-variance optimisation with ESG screening
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
 
     if st.session_state.beginner_mode:
-        st.success(
-            f"First-time user mode active. Risk aversion γ = {st.session_state.gamma:.2f} and ESG intensity λ = {st.session_state.lambda_esg:.2f}."
-        )
-        st.caption("The theoretical graphs below use the app's default asset assumptions unless you later change them on the inputs page.")
-    elif st.session_state.investor_type == "Experienced Investor" and st.session_state.has_existing_assets == "No":
-        st.info("Experienced Investor path with no existing asset combination selected. The app is using the current default assumptions.")
-
+        st.success(f"First-time user mode active. Risk aversion γ = {st.session_state.gamma:.2f} and ESG intensity λ = {st.session_state.lambda_esg:.2f}.")
+    
+    # --- Calculations ---
     mu = np.array([st.session_state.mu1_pct, st.session_state.mu2_pct]) / 100.0
     sigma = np.array([st.session_state.sigma1_pct, st.session_state.sigma2_pct]) / 100.0
     rf = st.session_state.rf_pct / 100.0
@@ -616,44 +575,43 @@ elif st.session_state.page == "results":
     gamma = st.session_state.gamma
     num_points = st.session_state.num_points
 
-    df_all = build_portfolio_grid(
-        mu=mu,
-        sigma=sigma,
-        rho=rho,
-        rf=rf,
-        esg_scores=esg_scores,
-        gamma=gamma,
-        lambda_esg=lambda_esg,
-        num_points=num_points,
-    )
+    df_all = build_portfolio_grid(mu=mu, sigma=sigma, rho=rho, rf=rf, esg_scores=esg_scores, gamma=gamma, lambda_esg=lambda_esg, num_points=num_points)
 
+    # ESG Calculations
     esg_cutoff = required_esg_threshold(df_all, lambda_esg)
     df_esg = df_all[df_all["ESG Score"] >= esg_cutoff - 1e-12].copy()
     if df_esg.empty:
         df_esg = df_all.loc[[df_all["ESG Score"].idxmax()]].copy()
 
+    # Identify Portfolios
     mvp_std, tan_std = select_key_portfolios(df_all)
     mvp_esg, tan_esg = select_key_portfolios(df_esg)
 
+    # --- NEW: METRICS ROW ---
+    # This displays the KPIs at the very top of the results
+    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+    m_col1.metric("ESG Cutoff", f"{esg_cutoff*100:.1f}/100", f"λ = {lambda_esg:.2f}")
+    m_col2.metric("Tangency Return", f"{tan_std['Expected Return']*100:.1f}%", f"Sharpe {tan_std['Sharpe Ratio']:.3f}")
+    m_col3.metric("MVP Std Dev", f"{mvp_std['Std Dev']*100:.1f}%")
+    m_col4.metric("ESG Tangency", f"{tan_esg['Expected Return']*100:.1f}%", "Post-screen")
+    
+    st.markdown("---") # Visual separator
+
+    # Summary DataFrames for tables
     std_summary = summary_df(mvp_std, tan_std, ("Minimum Variance Portfolio", "Tangency Portfolio"))
     esg_summary = summary_df(mvp_esg, tan_esg, ("ESG Minimum Variance Portfolio", "ESG Tangency Portfolio"))
 
-    st.markdown(
-        f"""
-        **ESG screen used in the 2-asset ESG graph**
-
-        Required portfolio ESG score = **{esg_cutoff * 100:.2f} / 100**
-        """
-    )
-
+    # --- TABS START HERE ---
     tab_analysis, tab_stock = st.tabs(["Theoretical model", "Stock-universe frontier"])
 
     with tab_analysis:
         st.subheader("1) Standard mean-variance frontier and CML")
+        # You can keep your Matplotlib code here or replace it with Plotly as discussed
         fig1, ax1 = plt.subplots(figsize=(10, 6))
-        x_all = df_all["Std Dev"] * 100
-        y_all = df_all["Expected Return"] * 100
-        rf_plot = rf * 100
+        # ... [rest of your plotting code] ...
+        st.pyplot(fig1)
+        st.subheader("Summary table: Standard graph")
+        st.dataframe(format_table(std_summary), use_container_width=True)
 
         ax1.plot(x_all, y_all, linewidth=2, label="Mean-variance frontier (all portfolios)")
         sigma_line_1 = np.linspace(0, max(float(x_all.max()), float(tan_std["Std Dev"] * 100)) * 1.10, 200)
