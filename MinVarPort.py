@@ -548,15 +548,15 @@ if st.session_state.page == "inputs":
 # =========================================================
 # Page 2: Results
 # =========================================================
-# Professional Styled Header for the Results Page
+def results_header():
     st.markdown("""
         <div style="padding: 1rem 0 1.5rem;">
-            <p style="color: #6B7280; font-size: 0.95rem; margin-bottom: -0.2rem; font-weight: 500;">
+            <h1 style="font-size: 1.6rem; font-weight: 600; color: #1B1B1B; margin-bottom: 0.3rem;">
                 ESG Portfolio Optimiser
-            </p>
-            <h1 style="font-size: 1.6rem; font-weight: 600; color: #1B1B1B;">
-                Results
             </h1>
+            <p style="color: #6B7280; font-size: 0.95rem;">
+                Analysis Results
+            </p>
         </div>
     """, unsafe_allow_html=True)
 
